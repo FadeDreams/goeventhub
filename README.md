@@ -8,7 +8,7 @@
 To use `goeventhub` in your Go module, run:
 
 ```bash
-go get github.com/fadedreams/goeventhub
+go get -u github.com/fadedreams/goeventhub
 ```
 
 ### Usage
