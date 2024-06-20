@@ -1,7 +1,7 @@
 
 ## goeventhub
 
-`goeventhub` is a Go package that provides an event emitter implementation with support for event handlers and filters.
+`goeventhub` is a Go package that provides an event emitter implementation with support for event handlers, filters, asynchronous event processing, and contextual event handling.
 
 ### Installation
 
