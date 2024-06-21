@@ -2,6 +2,8 @@ package goeventhub
 
 import (
 	"context"
+	"log"
+	"sort"
 	"sync"
 )
 
@@ -10,19 +12,33 @@ type EventHandler interface {
 	Handle(data interface{})
 }
 
+// PriorityEvent represents an event with its priority.
+type PriorityEvent struct {
+	event    string
+	priority int
+	data     interface{}
+}
+
 // EventEmitter represents an event emitter.
 type EventEmitter struct {
 	listeners map[string][]chan interface{}
-	handlers  map[string][]EventHandler // Map of event handlers
+	handlers  map[string][]EventHandler
+	events    []PriorityEvent
 	mutex     sync.Mutex
+	logging   bool
+	logger    *log.Logger
 }
 
 // NewEventEmitter creates a new instance of EventEmitter.
-func NewEventEmitter() *EventEmitter {
-	return &EventEmitter{
+func NewEventEmitter(logging bool) *EventEmitter {
+	emitter := &EventEmitter{
 		listeners: make(map[string][]chan interface{}),
 		handlers:  make(map[string][]EventHandler),
+		events:    make([]PriorityEvent, 0),
+		logging:   logging,
+		logger:    log.New(log.Writer(), "[EventEmitter] ", log.Flags()), // Initialize logger
 	}
+	return emitter
 }
 
 // On registers a listener for the specified event with optional filters.
@@ -35,48 +51,65 @@ func (emitter *EventEmitter) On(event string, filters ...func(interface{}) bool)
 
 	// Optionally apply filters to the channel
 	go func(ch chan interface{}) {
-		for {
-			select {
-			case data := <-ch:
-				if len(filters) == 0 {
-					// No filters, pass data directly
-					ch <- data
-				} else {
-					// Apply filters
-					for _, filter := range filters {
-						if filter(data) {
-							ch <- data
-							break
-						}
+		for data := range ch {
+			if len(filters) == 0 {
+				ch <- data
+			} else {
+				for _, filter := range filters {
+					if filter(data) {
+						ch <- data
+						break
 					}
 				}
 			}
 		}
+		close(ch)
 	}(ch)
 
 	return ch
 }
 
 // EmitWithContext emits an event with context for cancellation and timeout.
-func (emitter *EventEmitter) EmitWithContext(ctx context.Context, event string, data interface{}) {
+func (emitter *EventEmitter) EmitWithContext(ctx context.Context, event string, data interface{}, priority int) {
 	emitter.mutex.Lock()
-	defer emitter.mutex.Unlock()
+	if emitter.logging {
+		emitter.logger.Printf("Emitting event %s with priority %d\n", event, priority)
+	}
+	emitter.events = append(emitter.events, PriorityEvent{event: event, priority: priority, data: data})
+	emitter.mutex.Unlock()
+}
 
-	if listeners, ok := emitter.listeners[event]; ok {
-		for _, ch := range listeners {
-			go func(ch chan interface{}, data interface{}) {
+// ProcessEvents processes events in priority order.
+func (emitter *EventEmitter) ProcessEvents(ctx context.Context) {
+	for {
+		emitter.mutex.Lock()
+		if len(emitter.events) == 0 {
+			emitter.mutex.Unlock()
+			return
+		}
+		sort.Slice(emitter.events, func(i, j int) bool {
+			return emitter.events[i].priority > emitter.events[j].priority
+		})
+		eventToProcess := emitter.events[0]
+		emitter.events = emitter.events[1:]
+		emitter.mutex.Unlock()
+
+		if emitter.logging {
+			emitter.logger.Printf("Processing event %s with priority %d\n", eventToProcess.event, eventToProcess.priority)
+		}
+
+		if listeners, ok := emitter.listeners[eventToProcess.event]; ok {
+			for _, ch := range listeners {
 				select {
 				case <-ctx.Done():
-					// Context cancelled, do not send data
-				default:
-					ch <- data
+					return
+				case ch <- eventToProcess.data:
 				}
-			}(ch, data)
+			}
 		}
-	}
 
-	// Dispatch to registered handlers
-	emitter.dispatch(event, data)
+		emitter.dispatch(eventToProcess.event, eventToProcess.data)
+	}
 }
 
 // OnEvent registers an event handler for the specified event.
@@ -110,28 +143,6 @@ func (emitter *EventEmitter) Close() {
 	emitter.handlers = make(map[string][]EventHandler)
 }
 
-// ListenAndServe listens for events on specified channels and dispatches them to handlers.
-func (emitter *EventEmitter) ListenAndServe(ctx context.Context, chEmail, chSMS <-chan interface{}, handler1, handler2 EventHandler) {
-	go func() {
-		for {
-			select {
-			case notification := <-chEmail:
-				if h, ok := notification.(EventHandler); ok {
-					h.Handle(notification)
-				}
-				handler1.Handle(notification)
-			case notification := <-chSMS:
-				if h, ok := notification.(EventHandler); ok {
-					h.Handle(notification)
-				}
-				handler2.Handle(notification)
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-}
-
 // Helper function to dispatch events to registered handlers
 func (emitter *EventEmitter) dispatch(event string, data interface{}) {
 	if eventHandlers, ok := emitter.handlers[event]; ok {
@@ -139,4 +150,9 @@ func (emitter *EventEmitter) dispatch(event string, data interface{}) {
 			handler.Handle(data)
 		}
 	}
+}
+
+// SetLogging enables or disables logging for the EventEmitter.
+func (emitter *EventEmitter) SetLogging(enable bool) {
+	emitter.logging = enable
 }
