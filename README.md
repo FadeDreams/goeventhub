@@ -96,45 +96,59 @@ func main() {
 ```
 
 ### Documentation
-NewEventEmitter(logging bool) *EventEmitter
+#### NewEventEmitter(logging bool) *EventEmitter
+
 Creates a new instance of EventEmitter with optional logging enabled.
 
-- Parameters:
--- logging bool: Set to true to enable logging; false to disable.
-(*EventEmitter) On(event string, filters ...func(interface{}) bool) <-chan interface{}
+- **Parameters:**
+  - `logging bool`: Set to `true` to enable logging; `false` to disable.
+
+#### (*EventEmitter) On(event string, filters ...func(interface{}) bool) <-chan interface{}
+
 Registers a listener for the specified event with optional filters.
 
-- Parameters:
--- event string: The name of the event to listen for.
--- filters ...func(interface{}) bool: Optional filters to apply to incoming data.
-Returns:
--- `<-chan interface{}`: A channel to receive filtered events.
-(*EventEmitter) EmitWithContext(ctx context.Context, event string, data interface{}, priority int)
+- **Parameters:**
+  - `event string`: The name of the event to listen for.
+  - `filters ...func(interface{}) bool`: Optional filters to apply to incoming data.
+
+- **Returns:**
+  - `<-chan interface{}`: A channel to receive filtered events.
+
+#### (*EventEmitter) EmitWithContext(ctx context.Context, event string, data interface{}, priority int)
+
 Emits an event with context for cancellation and timeout.
 
-- Parameters:
--- ctx context.Context: Context for cancellation and timeout.
--- event string: The name of the event to emit.
--- data interface{}: Data associated with the event.
--- priority int: Priority of the event for processing.
-(*EventEmitter) OnEvent(event string, handler EventHandler)
+- **Parameters:**
+  - `ctx context.Context`: Context for cancellation and timeout.
+  - `event string`: The name of the event to emit.
+  - `data interface{}`: Data associated with the event.
+  - `priority int`: Priority of the event for processing.
+
+#### (*EventEmitter) OnEvent(event string, handler EventHandler)
+
 Registers an event handler for the specified event.
 
-- Parameters:
--- event string: The name of the event to handle.
--- handler EventHandler: Handler function that implements the Handle(data interface{}) method.
-(*EventEmitter) Off(event string)
+- **Parameters:**
+  - `event string`: The name of the event to handle.
+  - `handler EventHandler`: Handler function that implements the Handle(data interface{}) method.
+
+#### (*EventEmitter) Off(event string)
+
 Unregisters all listeners and handlers for the specified event.
 
-- Parameters:
--- event string: The name of the event to unregister.
-(*EventEmitter) Close()
+- **Parameters:**
+  - `event string`: The name of the event to unregister.
+
+#### (*EventEmitter) Close()
+
 Closes all event channels and clears the listener map.
-(*EventEmitter) ListenAndServe(ctx context.Context, chEmail, chSMS <-chan interface{}, handler1, handler2 EventHandler)
+
+#### (*EventEmitter) ListenAndServe(ctx context.Context, chEmail, chSMS <-chan interface{}, handler1, handler2 EventHandler)
+
 Listens for events on specified channels and dispatches them to handlers.
 
-- Parameters:
--- ctx context.Context: Context for cancellation.
--- chEmail <-chan interface{}: Channel for receiving email notifications.
--- chSMS <-chan interface{}: Channel for receiving SMS notifications.
--- handler1, handler2 EventHandler: Event handlers for email and SMS notifications respectively.
+- **Parameters:**
+  - `ctx context.Context`: Context for cancellation.
+  - `chEmail <-chan interface{}`: Channel for receiving email notifications.
+  - `chSMS <-chan interface{}`: Channel for receiving SMS notifications.
+  - `handler1, handler2 EventHandler`: Event handlers for email and SMS notifications respectively.
